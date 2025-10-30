@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mobile Charger Battery Simulation</title>
+<style>
+  :root{
+    --bg-start: #eaf6ff; /* soft light blue */
+    --bg-end: #ffffff;   /* white */
+    --card: #fff;
+    --muted: #55606f;
+    --blue: #0ea5e9;
+    --accent: #06b6d4;
+    font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  html,body{height:100%; margin:0; background: linear-gradient(180deg,var(--bg-start), var(--bg-end)); color:#07263a;}
+  .wrap{max-width:1200px; margin:20px auto; padding:18px; box-sizing:border-box;}
+  header{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  header h1{margin:0; font-size:20px;}
+  header p{margin:0; color:var(--muted); font-size:13px;}
+  .layout{display:grid; grid-template-columns: 1fr 420px; gap:18px;}
+  .left {background:var(--card); padding:14px; border-radius:12px; box-shadow:0 10px 30px rgba(3,37,65,0.06);}
+  .right {background:var(--card); padding:14px; border-radius:12px; box-shadow:0 10px 30px rgba(3,37,65,0.06);}
+
+  .component-row{display:flex; gap:10px; align-items:center; justify-content:center; padding:8px;}
+  .comp {
+    min-width:120px; padding:12px 10px; border-radius:10px; background:linear-gradient(180deg,#fff,#f2fbff);
+    border:1px solid rgba(2,6,23,0.04); text-align:center; font-weight:700; color:#033e5a; position:relative;
+    box-shadow:0 6px 18px rgba(3,37,65,0.04);
+  }
+  .comp .small{display:block; font-weight:600; color:var(--muted); font-size:12px;}
+  .arrow{width:36px; height:36px; display:flex; align-items:center; justify-content:center;}
+  .adapterLabel{margin-top:8px; text-align:center; font-size:13px; color:var(--muted); font-weight:700;}
+
+  .sim-area{display:flex; gap:12px; align-items:center; padding:18px; border-radius:10px; background:linear-gradient(180deg,#f9feff,#f3fff8); border:1px dashed rgba(6,30,80,0.04); position:relative; overflow:hidden; min-height:260px;}
+  .flow-col {flex:1; display:flex; flex-direction:column; gap:12px; align-items:center;}
+  .flow-track{width:92%; height:18px; border-radius:12px; background:linear-gradient(90deg,#e6f7ff,#e9fff0); position:relative; box-shadow: inset 0 6px 18px rgba(6,30,80,0.03);}
+  .flow-glow{
+    position:absolute; left:4%; right:4%; top:0; bottom:0; border-radius:12px;
+    filter: blur(var(--glow-blur,6px)); opacity: var(--glow-opacity,0.06);
+    box-shadow: 0 0 40px var(--glow-color, rgba(6,30,80,0.06)) inset;
+    pointer-events:none;
+    transition: filter 0.2s linear, opacity 0.2s linear, box-shadow 0.2s linear;
+  }
+
+  .electron{
+    position:absolute; width:10px; height:10px; border-radius:50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.6));
+    box-shadow: 0 6px 18px rgba(2,6,23,0.12);
+    top:50%; transform:translateY(-50%);
+    will-change:transform, opacity, filter;
+    transition: background 0.2s linear, box-shadow 0.2s linear;
+  }
+
+  .stats{display:flex; gap:12px; align-items:center; justify-content:space-between; width:100%;}
+  .stat{background:linear-gradient(180deg,#fff,#fbfffb); padding:8px 12px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.03); min-width:120px; text-align:center;}
+  .stat .big{font-weight:800; font-size:18px;}
+  .controls {margin-top:12px; display:grid; gap:10px; background:transparent;}
+
+  .control-row{display:flex; gap:10px; align-items:center; justify-content:space-between;}
+  .control-row label{flex:1; color:var(--muted); font-weight:700; font-size:13px;}
+  input[type="range"]{flex:2; accent-color: var(--accent); width:100%;}
+  .control-value{min-width:78px; text-align:right; font-weight:800; color:#0f172a}
+
+  .phone-wrap{width:220px; display:flex; flex-direction:column; gap:6px; align-items:center;}
+  .phone {
+    width:160px; height:320px; border-radius:28px; background:linear-gradient(180deg,#ffffff,#eaf7ff);
+    border:6px solid #e9f8ff; position:relative; box-shadow: 0 18px 50px rgba(2,6,23,0.08);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; padding:18px; box-sizing:border-box;
+  }
+  .phone .notch{width:56px;height:6px;border-radius:6px;background:#e1f6ff; position:absolute; top:10px;}
+  .screen{width:100%; height:78%; background:linear-gradient(180deg,#f8ffff,#f0fff7); border-radius:12px; position:relative; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:10px; box-sizing:border-box;}
+  .batteryBar{width:80%; height:18px; background:#e8f6f0; border-radius:8px; border:1px solid rgba(2,6,23,0.03); position:relative; overflow:hidden}
+  .batteryFill{position:absolute; left:0; top:0; bottom:0; width:20%; background:linear-gradient(90deg,#16a34a,#34d399); transition:width 1s linear; display:flex; align-items:center; justify-content:center; color:white; font-weight:700}
+  .bolt{width:28px; height:28px; margin-top:10px; opacity:0.95; filter: drop-shadow(0 6px 14px rgba(6,30,80,0.08));}
+
+  .etaBelow{font-weight:700; margin-top:6px; color:#073642}
+  .phone .bottom {font-size:13px; color:var(--muted); margin-top:6px; text-align:center;}
+
+  .buttons{display:flex; gap:8px; margin-top:8px;}
+  .btn {background:linear-gradient(90deg,var(--blue),#38bdf8); border:none; color:white; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; box-shadow:0 8px 22px rgba(14,165,233,0.12)}
+  .ghost{background:transparent; border:1px solid rgba(2,6,23,0.06); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700;}
+
+  .modal-bg{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(2,6,23,0.35); z-index:60;}
+  .modal{background:var(--card); width:640px; max-width:94%; padding:18px; border-radius:12px; box-shadow:0 18px 60px rgba(2,6,23,0.18)}
+  .close-x{float:right; cursor:pointer; color:var(--muted); font-weight:700; font-size:18px}
+
+  @media (max-width:1000px){
+    .layout{grid-template-columns:1fr; }
+    .phone-wrap{order:2; margin-top:12px; align-self:center}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Mobile Charger Battery Simulation">
+    <header>
+      <div>
+        <h1>Mobile Charger Battery Simulation</h1>
+        <p class="small">Visual: AC → Transformer → Rectifier → Filter → Regulator → AC–DC Adapter → Phone</p>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <button id="resetBtnTop" class="ghost" title="Reset simulation">Reset</button>
+        <button id="learnBtn" class="btn">Learn More</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="left" aria-label="Charger simulation area">
+        <div class="component-row" role="group" aria-label="Charger components">
+          <div class="comp"><span class="small">AC Source</span>AC</div>
+          <div class="arrow" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M2 12h16" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6l6 6-6 6" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="comp"><span class="small">Transformer</span>Step-down</div>
+          <div class="arrow" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M2 12h16" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6l6 6-6 6" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="comp"><span class="small">Rectifier</span>AC → DC</div>
+          <div class="arrow" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M2 12h16" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6l6 6-6 6" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="comp"><span class="small">Filter</span>Capacitor</div>
+          <div class="arrow" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M2 12h16" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6l6 6-6 6" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="comp"><span class="small">Regulator</span>Stabilize</div>
+        </div>
+
+        <div style="text-align:center; margin-top:8px;" class="adapterLabel">AC–DC Adapter (charger circuitry)</div>
+
+        <div style="margin-top:14px;" class="sim-area" aria-hidden="false">
+          <div class="flow-col" style="flex:1;">
+            <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-weight:800; color:#063a53">Energy Flow</div>
+              <div style="color:var(--muted); font-size:13px">Electrons →</div>
+            </div>
+
+            <div class="flow-track" id="flowTrack" role="img" aria-label="Flow line showing moving electrons">
+              <div class="flow-glow" id="flowGlow" style="--glow-color: rgba(6,180,150,0.22)"></div>
+              <!-- electrons injected by JS -->
+            </div>
+
+            <div style="width:100%;" class="stats">
+              <div class="stat">
+                <div style="font-size:12px; color:var(--muted)">Battery Level</div>
+                <div class="big" id="batteryPct">20%</div>
+              </div>
+              <div class="stat">
+                <div style="font-size:12px; color:var(--muted)">Charging Speed</div>
+                <div class="big" id="speedLabel">Idle</div>
+              </div>
+              <div class="stat">
+                <div style="font-size:12px; color:var(--muted)">Power (approx)</div>
+                <div class="big" id="powerRead">0.00 W</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone-wrap" aria-hidden="false" style="margin-left:14px; align-items:center;">
+            <div class="phone" role="img" aria-label="Phone showing battery">
+              <div class="notch" aria-hidden="true"></div>
+              <div class="screen">
+                <div style="width:100%; display:flex; flex-direction:column; gap:12px; align-items:center;">
+                  <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:700; color:#063a53">Charging</div>
+                    <div style="font-size:12px; color:var(--muted)"><span id="phonePct">20%</span></div>
+                  </div>
+
+                  <div class="batteryBar" aria-hidden="true">
+                    <div class="batteryFill" id="batteryFill" style="width:20%;">&nbsp;</div>
+                  </div>
+
+                  <svg class="bolt" id="boltIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2L3 14h7l-1 8L21 10h-7l-1-8z" fill="#fffb" stroke="#ffeb3b" stroke-width="0.8"/>
+                    <path d="M13 2L3 14h7l-1 8L21 10h-7l-1-8z" fill="#facc15" style="mix-blend-mode:screen;"/>
+                  </svg>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- ETA placed below the phone (outside the phone) as requested -->
+            <div class="etaBelow" id="etaTextBelow">ETA: --</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="right" role="region" aria-label="Controls">
+        <h3 style="margin-top:0; margin-bottom:6px;">Controls & Readouts</h3>
+
+        <div class="controls" role="form" aria-label="Simulation controls">
+          <div class="control-row">
+            <label for="voltage">Input Voltage (V)</label>
+            <input id="voltage" type="range" min="100" max="260" step="1" value="230" />
+            <div class="control-value" id="voltageVal">230 V</div>
+          </div>
+
+          <div class="control-row">
+            <label for="current">Charging Current (A)</label>
+            <input id="current" type="range" min="0.1" max="2.5" step="0.1" value="2.0" />
+            <div class="control-value" id="currentVal">2.0 A</div>
+          </div>
+
+          <div class="control-row">
+            <label for="capacity">Battery Capacity (mAh)</label>
+            <input id="capacity" type="range" min="1000" max="6000" step="100" value="4000" />
+            <div class="control-value" id="capacityVal">4000 mAh</div>
+          </div>
+
+          <div class="control-row">
+            <label for="efficiency">Charger Efficiency (%)</label>
+            <input id="efficiency" type="range" min="50" max="100" step="1" value="85"/>
+            <div class="control-value" id="effVal">85 %</div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:12px;">
+            <button id="startBtn" class="btn">Start Simulation</button>
+            <button id="pauseBtn" class="ghost">Pause</button>
+            <button id="resetBtn" class="ghost">Reset</button>
+          </div>
+
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:13px; color:var(--muted)">Calculated values</div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:linear-gradient(180deg,#fff,#fbfffb); padding:8px; border-radius:8px; text-align:center;">
+                <div style="font-size:12px; color:var(--muted)">Power →</div>
+                <div id="powerRead2" style="font-weight:800;">0.00 W</div>
+              </div>
+              <div style="flex:1; background:linear-gradient(180deg,#fff,#fbfffb); padding:8px; border-radius:8px; text-align:center;">
+                <div style="font-size:12px; color:var(--muted)">Charge Rate</div>
+                <div id="rateRead" style="font-weight:800;">0.00 %/hr</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-bg" id="modalBg" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="How charger works">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0">How a Charger Converts AC → DC (Simple)</h3>
+          <div class="close-x" id="closeModal">✕</div>
+        </div>
+        <div style="color:var(--muted); margin-top:8px;">
+          <ol>
+            <li><strong>Transformer / switching stage:</strong> adjusts mains voltage down to a usable level.</li>
+            <li><strong>Rectifier:</strong> converts AC into pulsating DC (diodes or switches).</li>
+            <li><strong>Filter (capacitor):</strong> smooths the pulsating DC into steadier DC by storing and releasing charge — this reduces ripple.</li>
+            <li><strong>Voltage regulator / control:</strong> provides a stable charging voltage and controls current (CC/CV stages and battery management).</li>
+          </ol>
+          <p>This simulation simplifies real electronics: voltage, current and efficiency affect how fast the battery (mAh) fills. The center flow visual ties speed (electrons) and glow intensity to these variables so you can see the effect directly.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  // DOM refs
+  const flowTrack = document.getElementById('flowTrack');
+  const flowGlow = document.getElementById('flowGlow');
+  const batteryFill = document.getElementById('batteryFill');
+  const batteryPct = document.getElementById('batteryPct');
+  const phonePct = document.getElementById('phonePct');
+  const speedLabel = document.getElementById('speedLabel');
+  const powerRead = document.getElementById('powerRead');
+  const powerRead2 = document.getElementById('powerRead2');
+  const rateRead = document.getElementById('rateRead');
+  const etaTextBelow = document.getElementById('etaTextBelow');
+
+  const voltage = document.getElementById('voltage');
+  const current = document.getElementById('current');
+  const capacity = document.getElementById('capacity');
+  const efficiency = document.getElementById('efficiency');
+
+  const voltageVal = document.getElementById('voltageVal');
+  const currentVal = document.getElementById('currentVal');
+  const capacityVal = document.getElementById('capacityVal');
+  const effVal = document.getElementById('effVal');
+
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const resetBtnTop = document.getElementById('resetBtnTop');
+
+  const learnBtn = document.getElementById('learnBtn');
+  const modalBg = document.getElementById('modalBg');
+  const closeModal = document.getElementById('closeModal');
+
+  const DEFAULTS = {
+    voltage: 230,
+    current: 2.0,
+    capacity: 4000,
+    efficiency: 85,
+    battery: 20
+  };
+
+  // state
+  let batteryLevel = DEFAULTS.battery;
+  let running = false;      // only true when Start is clicked and not paused
+  let lastTs = null;
+  let electrons = [];
+  let electronCount = 16;
+  let travelWidth = 1;
+
+  // init UI labels
+  function updateControlLabels(){
+    voltageVal.textContent = voltage.value + ' V';
+    currentVal.textContent = Number(current.value).toFixed(1) + ' A';
+    capacityVal.textContent = capacity.value + ' mAh';
+    effVal.textContent = efficiency.value + ' %';
+  }
+  updateControlLabels();
+
+  // math helpers
+  function computePower(){
+    const V = Number(voltage.value);
+    const I = Number(current.value);
+    const eff = Number(efficiency.value)/100;
+    return V * I * eff;
+  }
+  function computePercentPerHour(){
+    const I = Number(current.value);
+    const cap = Number(capacity.value);
+    const eff = Number(efficiency.value)/100;
+    return (I * 1000 / cap) * 100 * eff;
+  }
+  function computePercentPerSecond(){
+    return computePercentPerHour() / 3600;
+  }
+
+  // intensity (bright cyan/greenish tone like v3)
+  function computeIntensity(){
+    const V = Number(voltage.value);
+    const I = Number(current.value);
+    const eff = Number(efficiency.value)/100;
+
+    const normV = (V - 100) / (260 - 100); // 0..1
+    const normI = (I - 0.1) / (2.5 - 0.1); // 0..1
+    const intensity = Math.min(0.95, 0.15 + 0.85 * (0.6*normI + 0.4*normV) * eff);
+
+    const blur = 6 + intensity * 28;
+    const opacity = 0.06 + intensity * 0.7;
+
+    // bright cyan/greenish tone (as requested: same tone as v3)
+    const g = Math.round(180 + 60 * normI); // more green with current
+    const b = Math.round(170 + 50 * normV); // more cyan with voltage
+    const glowColor = `rgba(6, ${g}, ${b}, 0.95)`;
+
+    return { intensity, blur, opacity, glowColor, g, b };
+  }
+
+  // create electrons (static until running)
+  function createElectrons(){
+    flowTrack.querySelectorAll('.electron').forEach(n => n.remove());
+    electrons = [];
+    const trackRect = flowTrack.getBoundingClientRect();
+    travelWidth = trackRect.width * 0.92;
+    electronCount = Math.max(8, Math.round(trackRect.width / 45));
+    for(let i=0;i<electronCount;i++){
+      const el = document.createElement('div');
+      el.className = 'electron';
+      el.dataset.pos = (i / electronCount) * 0.95;
+      el.style.left = (4 + 0.92 * 100 * Number(el.dataset.pos)) + '%';
+      el.style.opacity = String(0.6 + 0.4 * Math.random());
+      // default DIM color so nothing appears to flow until Start
+      el.style.background = 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(220,230,235,0.7))';
+      el.style.boxShadow = '0 6px 12px rgba(2,6,23,0.06)';
+      flowTrack.appendChild(el);
+      electrons.push(el);
+    }
+    // default (dim) glow:
+    flowGlow.style.setProperty('--glow-blur', '6px');
+    flowGlow.style.setProperty('--glow-opacity', '0.04');
+    flowGlow.style.setProperty('--glow-color', 'rgba(6,140,150,0.12)');
+  }
+
+  function setBatteryVisual(p){
+    p = Math.max(0, Math.min(100, p));
+    batteryFill.style.width = p + '%';
+    batteryPct.textContent = Math.round(p) + '%';
+    phonePct.textContent = Math.round(p) + '%';
+  }
+  setBatteryVisual(batteryLevel);
+
+  // apply bright visuals (when running). If force=false and not running, do nothing.
+  function applyVisuals(force=false){
+    if (!running && !force) return;
+    const v = computeIntensity();
+    flowGlow.style.setProperty('--glow-blur', v.blur + 'px');
+    flowGlow.style.setProperty('--glow-opacity', v.opacity);
+    flowGlow.style.setProperty('--glow-color', v.glowColor);
+
+    electrons.forEach((e, idx) => {
+      const top = `rgba(255,255,255,${0.85 + 0.15*v.intensity})`;
+      const bot = `rgba(6, ${v.g}, ${v.b}, ${0.98})`;
+      // make electron show a bright cyan/greenish gradient
+      e.style.background = `radial-gradient(circle at 30% 30%, ${top}, ${bot})`;
+      e.style.boxShadow = `0 8px 20px rgba(6, ${v.g}, ${v.b}, ${0.18 + 0.3*v.intensity})`;
+      const s = 6 + Math.round(6 * v.intensity * (0.6 + (idx%3)/3));
+      e.style.width = s + 'px';
+      e.style.height = s + 'px';
+      e.style.borderRadius = (s/2) + 'px';
+    });
+  }
+
+  function setDefaultVisuals(){
+    // used by reset to show dim default (no flow)
+    flowGlow.style.setProperty('--glow-blur', '6px');
+    flowGlow.style.setProperty('--glow-opacity', '0.04');
+    flowGlow.style.setProperty('--glow-color', 'rgba(6,140,150,0.12)');
+    electrons.forEach((e, i) => {
+      e.style.background = 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(220,230,235,0.7))';
+      e.style.boxShadow = '0 6px 12px rgba(2,6,23,0.06)';
+      const s = 6;
+      e.style.width = s + 'px';
+      e.style.height = s + 'px';
+      e.style.borderRadius = (s/2) + 'px';
+    });
+  }
+
+  function setSpeedLabel(pph){
+    if (pph <= 2) return 'Very Slow';
+    if (pph <= 10) return 'Slow';
+    if (pph <= 30) return 'Medium';
+    if (pph <= 60) return 'Fast';
+    return 'Very Fast';
+  }
+
+  function updateETA(pct){
+    if (pct >= 100) { etaTextBelow.textContent = 'Estimated Time to Full Charge: Full'; return; }
+    const pps = computePercentPerSecond();
+    if (pps <= 0) { etaTextBelow.textContent = 'Estimated Time to Full Charge: --'; return; }
+    let secs = (100 - pct) / pps;
+    const hrs = Math.floor(secs / 3600);
+    secs -= hrs * 3600;
+    const mins = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    const parts = [];
+    if (hrs) parts.push(hrs + 'h');
+    if (mins) parts.push(mins + 'm');
+    parts.push(s + 's');
+    etaTextBelow.textContent = 'Estimated Time to Full Charge: ' + parts.join(' ');
+  }
+
+  // main animation loop
+  function tick(ts){
+    if (!lastTs) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+
+    if (running){
+      applyVisuals(true);
+
+      // compute movement speed
+      const base = 80;
+      const normV = (Number(voltage.value) - 100) / (260 - 100);
+      const normI = (Number(current.value) - 0.1) / (2.5 - 0.1);
+      const eff = Number(efficiency.value)/100;
+      const speedPxPerSec = base * (0.6 + normV*0.6) * (0.6 + normI*0.8) * (0.6 + eff*0.8);
+
+      const trackRect = flowTrack.getBoundingClientRect();
+      travelWidth = trackRect.width * 0.92;
+
+      electrons.forEach((e) => {
+        let pos = Number(e.dataset.pos);
+        const fracPerSec = (speedPxPerSec / travelWidth);
+        pos += fracPerSec * dt;
+        if (pos > 1) pos -= 1;
+        e.dataset.pos = pos;
+        const leftPct = 4 + pos * 92;
+        e.style.left = leftPct + '%';
+      });
+
+      // charging progression (realistic simple model)
+      const pps = computePercentPerSecond();
+      batteryLevel += pps * dt;
+      if (batteryLevel >= 100){
+        batteryLevel = 100;
+        running = false;
+        startBtn.textContent = 'Start Simulation';
+        pauseBtn.textContent = 'Pause';
+      }
+      setBatteryVisual(batteryLevel);
+    } else {
+      // not running: do not move electrons or change glow.
+    }
+
+    // update readouts always
+    const power = computePower();
+    const pph = computePercentPerHour();
+    powerRead.textContent = power.toFixed(2) + ' W';
+    powerRead2.textContent = power.toFixed(2) + ' W';
+    rateRead.textContent = pph.toFixed(2) + ' %/hr';
+    speedLabel.textContent = running ? setSpeedLabel(pph) : 'Idle';
+    updateETA(batteryLevel);
+
+    requestAnimationFrame(tick);
+  }
+
+  // listeners
+  voltage.addEventListener('input', () => { updateControlLabels(); if (running) applyVisuals(true); updateETA(batteryLevel); });
+  current.addEventListener('input', () => { updateControlLabels(); if (running) applyVisuals(true); updateETA(batteryLevel); });
+  capacity.addEventListener('input', () => { updateControlLabels(); updateETA(batteryLevel); });
+  efficiency.addEventListener('input', () => { updateControlLabels(); if (running) applyVisuals(true); updateETA(batteryLevel); });
+
+  startBtn.addEventListener('click', () => {
+    if (!running){
+      running = true;
+      startBtn.textContent = 'Running';
+      pauseBtn.textContent = 'Pause';
+      lastTs = null;
+    }
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    if (running){
+      running = false;
+      pauseBtn.textContent = 'Resume';
+      startBtn.textContent = 'Start Simulation';
+      lastTs = null;
+    } else {
+      running = true;
+      pauseBtn.textContent = 'Pause';
+      startBtn.textContent = 'Running';
+      lastTs = null;
+    }
+  });
+
+  function resetAll(){
+    running = false;
+    batteryLevel = DEFAULTS.battery;
+    voltage.value = DEFAULTS.voltage;
+    current.value = DEFAULTS.current.toFixed(1);
+    capacity.value = DEFAULTS.capacity;
+    efficiency.value = DEFAULTS.efficiency;
+    updateControlLabels();
+    setBatteryVisual(batteryLevel);
+    // reset electron positions and visuals to dim default
+    electrons.forEach((e, i) => {
+      e.dataset.pos = (i / electronCount) * 0.95;
+      e.style.left = (4 + 0.92 * 100 * Number(e.dataset.pos)) + '%';
+    });
+    setDefaultVisuals();
+    startBtn.textContent = 'Start Simulation';
+    pauseBtn.textContent = 'Pause';
+    lastTs = null;
+    updateETA(batteryLevel);
+  }
+
+  resetBtn.addEventListener('click', resetAll);
+  resetBtnTop.addEventListener('click', resetAll);
+
+  // modal
+  learnBtn.addEventListener('click', ()=>{ modalBg.style.display='flex'; modalBg.setAttribute('aria-hidden','false'); });
+  closeModal.addEventListener('click', ()=>{ modalBg.style.display='none'; modalBg.setAttribute('aria-hidden','true'); });
+  modalBg.addEventListener('click', (e)=>{ if(e.target===modalBg){ modalBg.style.display='none'; modalBg.setAttribute('aria-hidden','true'); }});
+
+  window.addEventListener('resize', () => { createElectrons(); });
+
+  // initial setup
+  createElectrons();
+  setBatteryVisual(batteryLevel);
+  updateETA(batteryLevel);
+  lastTs = null;
+  requestAnimationFrame(tick);
+
+  // accessibility
+  document.addEventListener('keydown', (e)=>{
+    if (e.code === 'Space'){ e.preventDefault(); if (!running){ running = true; startBtn.textContent='Running'; pauseBtn.textContent='Pause'; lastTs=null; } else { running=false; startBtn.textContent='Start Simulation'; pauseBtn.textContent='Pause'; lastTs=null; } }
+  });
+
+})();
+</script>
+</body>
+</html>
