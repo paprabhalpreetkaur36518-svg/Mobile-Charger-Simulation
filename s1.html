@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mobile Charger Circuit — Interactive Simulation</title>
+<style>
+/* ===========================================================
+   Mobile Charger Circuit Simulator
+   Single-file HTML/CSS/JS simulation
+   - Clean professional palette
+   - Responsive flex layout
+   - Inline styles for portability
+   =========================================================== */
+
+/* Color palette (professional) */
+:root{
+  --bg:#0f1724;          /* deep navy */
+  --panel:#0b1220;       /* darker panel */
+  --accent:#2dd4bf;      /* teal */
+  --muted:#94a3b8;       /* cool gray */
+  --card:#0b1320;        /* card bg */
+  --danger:#fb7185;      /* red for warnings */
+  --soft:#1f2937;        /* soft dark */
+  --glass: rgba(255,255,255,0.04);
+  --glass-2: rgba(255,255,255,0.02);
+}
+
+/* Reset + body */
+*{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#041026 120%);color:#e6eef8;}
+.container{display:flex;flex-direction:column;min-height:100vh;padding:16px;gap:12px;}
+.header{
+  display:flex;align-items:flex-start;gap:12px;
+  flex-wrap:wrap;
+}
+.title{
+  font-size:1.25rem;font-weight:700;color:var(--accent);
+}
+.subtitle{color:var(--muted);font-size:0.92rem;margin-top:4px}
+
+/* Layout panels */
+.main{
+  display:flex;gap:12px;align-items:flex-start;
+  width:100%;
+}
+.left-panel, .right-panel{
+  border-radius:12px;background:linear-gradient(180deg,var(--panel),#07101a);
+  padding:12px; box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+}
+.left-panel{flex:1;min-width:320px;}
+.right-panel{width:360px;max-width:42%;}
+
+/* Waveforms bottom */
+.bottom-panel{
+  margin-top:12px;border-radius:12px;padding:12px;background:linear-gradient(180deg,var(--panel),#06111a);
+  box-shadow:0 6px 18px rgba(2,6,23,0.6);
+}
+
+/* Circuit canvas (SVG) */
+.circuit-wrap{background:var(--glass);padding:12px;border-radius:8px;display:flex;flex-direction:column;gap:8px;}
+.circuit-svg{width:100%;height:360px;border-radius:8px;background:linear-gradient(180deg,rgba(45,212,191,0.02),transparent);}
+
+/* Controls */
+.controls{display:flex;flex-direction:column;gap:10px;}
+.control-row{display:flex;gap:8px;align-items:center;}
+.label{width:160px;color:var(--muted);font-size:0.9rem}
+.input{flex:1;display:flex;align-items:center;gap:8px}
+.slider{width:100%}
+.small{font-size:0.85rem;color:var(--muted)}
+.select,input[type="number"]{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px;border-radius:6px;min-width:0}
+.btn-row{display:flex;gap:8px;margin-top:6px}
+button{background:var(--accent);border:0;padding:8px 12px;border-radius:8px;color:#042024;font-weight:700;cursor:pointer}
+button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);font-weight:600}
+.numeric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.metric{background:var(--glass-2);padding:10px;border-radius:8px}
+.metric .val{font-size:1.1rem;font-weight:700;color:#e6eef8}
+.metric .lbl{font-size:0.85rem;color:var(--muted)}
+
+/* Waveform canvases */
+.wave-row{display:flex;gap:12px;flex-wrap:wrap}
+.wave-canvas{flex:1;min-width:260px;height:160px;border-radius:8px;background:#041226;border:1px solid rgba(255,255,255,0.03)}
+
+/* Battery visualization */
+.batt-wrap{display:flex;gap:12px;align-items:center}
+.batt-svg{width:120px;height:60px}
+.batt-info{display:flex;flex-direction:column;gap:4px}
+
+/* Thermometer */
+.thermo{display:flex;align-items:center;gap:8px}
+.thermo .bar{width:10px;height:48px;background:linear-gradient(180deg,#07202a,#021015);border-radius:6px;position:relative;border:1px solid rgba(255,255,255,0.04)}
+.thermo .fill{position:absolute;left:0;right:0;bottom:0;border-radius:6px;background:linear-gradient(180deg,#fed7aa,#fb7185)}
+.thermo .tlabel{font-size:0.9rem;color:var(--muted)}
+
+/* Electron dot and glow styling */
+svg .electron {
+  pointer-events: none;
+  filter: url(#glow);
+}
+
+/* If electron circles are appended with inline style, the filter id is used;
+   this ensures the glow effect is present. */
+#electron-layer circle {
+  transition: opacity 0.12s linear;
+}
+
+/* Footer */
+.how{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:10px;border-radius:8px;color:var(--muted);font-size:0.92rem}
+.legend{font-size:0.82rem;color:var(--muted);margin-top:8px}
+
+/* Responsive tweaks */
+@media (max-width:980px){
+  .main{flex-direction:column;}
+  .right-panel{width:100%;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <div class="title">Mobile Charger Circuit — Interactive Simulation</div>
+      <div class="subtitle">Explore rectification, filtering, CC/CV charging and regulator behavior in real time.</div>
+    </div>
+    <div style="margin-left:auto" class="small">Runs fully in your browser — no libraries.</div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how">
+    <strong>How it works (short):</strong>
+    This simulation shows an AC source (transformer or SMPS), a bridge rectifier, smoothing capacitor, regulator (linear or buck), a CC/CV charge controller and a Li-ion battery modeled by a simple Thevenin equivalent. Real-time waveforms show rectified voltage, ripple on the capacitor, charging current and battery voltage. Adjust parameters on the right and press <em>Start Simulation</em>.
+  </div>
+
+  <div class="main">
+    <!-- LEFT: SVG Circuit + Waveforms -->
+    <div class="left-panel">
+      <div class="circuit-wrap">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Circuit Diagram</strong>
+          <div class="small" id="sim-state">State: paused</div>
+        </div>
+        <!-- SVG circuit — components will be updated by JS (fill/highlight) -->
+         <!-- SVG circuit — components will be updated by JS (fill/highlight) -->
+       <!-- Patched SVG: drop this in place of your existing <svg id="circuit"> ... </svg> -->
+<svg id="circuit" class="circuit-svg" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#062634" /><stop offset="1" stop-color="#021018"/></linearGradient>
+    <linearGradient id="bgrad" x1="0" x2="1"><stop offset="0" stop-color="#ffd166"/><stop offset="1" stop-color="#facc15"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- small soft shadow for particles -->
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.4" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Left: AC source -->
+  <g id="ac-block" transform="translate(40,40)">
+    <rect x="0" y="0" width="220" height="140" rx="10" fill="rgba(255,255,255,0.02)"/>
+    <text x="14" y="26" fill="#9fe6d8" font-size="14" font-weight="700">AC Input</text>
+    <text id="ac-vals" x="14" y="46" fill="#94a3b8" font-size="12">0 V, 50 Hz</text>
+    <path id="sine" d="M18 100 Q30 60 54 100 T90 100 T126 100" fill="none" stroke="#2dd4bf" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Transformer / SMPS block -->
+  <g id="xfmr-block" transform="translate(280,26)">
+    <rect x="0" y="0" width="160" height="180" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="14" y="26" fill="#9fe6d8" font-size="14" font-weight="700" id="xfmr-label">Transformer</text>
+    <text x="14" y="46" fill="#94a3b8" font-size="12" id="xfmr-vals">ratio 1:1</text>
+    <g id="coil" transform="translate(14,70)" stroke="#7dd3fc" stroke-width="3" fill="none">
+      <path d="M0 0 q6 -18 12 0 q6 -18 12 0 q6 -18 12 0" stroke-linecap="round"/>
+      <path transform="translate(70,0)" d="M0 0 q6 -18 12 0 q6 -18 12 0 q6 -18 12 0" stroke-linecap="round"/>
+      <rect x="58" y="-10" width="6" height="10" fill="#7dd3fc" opacity="0.3"></rect>
+    </g>
+    <text id="smps-badge" x="14" y="142" font-size="11" fill="#ffd6a5" opacity="0.0">SMPS MODE</text>
+  </g>
+
+  <!-- Wiring between blocks (explicit paths used by particle engine) -->
+  <g id="wires" transform="translate(0,0)">
+    <path id="wire_ac_tx" d="M260 110 L280 110" stroke="#7c9bb3" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path id="wire_tx_br" d="M440 110 L520 110" stroke="#7c9bb3" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path id="wire_br_cap" d="M680 110 L720 110" stroke="#7c9bb3" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <!-- IMPORTANT: this is the exact path you chose for A (cap -> left -> down -> left -> reg) -->
+    <path id="wire_cap_reg" d="M800 160 L720 160 L720 250 L420 250" stroke="#7c9bb3" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path id="wire_reg_batt" d="M420 320 L520 320" stroke="#7c9bb3" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Bridge rectifier -->
+  <g id="bridge" transform="translate(520,20)">
+    <rect x="0" y="0" width="160" height="180" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="12" y="26" fill="#9fe6d8" font-size="14" font-weight="700">Bridge Rectifier</text>
+    <g id="diodes" transform="translate(10,60)" fill="#cbd5e1">
+      <path id="d1" d="M0 0 L28 0 L14 18 Z" fill="#cbd5e1"></path>
+      <rect x="20" y="-6" width="8" height="20" fill="#94a3b8" opacity="0.1"></rect>
+      <g transform="translate(60,0)"><path id="d2" d="M0 0 L28 0 L14 18 Z" fill="#cbd5e1" transform="scale(-1,1) translate(-28,0)"></path></g>
+      <g transform="translate(0,44)"><path id="d3" d="M14 0 L28 18 L0 18 Z" fill="#cbd5e1"></path></g>
+      <g transform="translate(60,44)"><path id="d4" d="M14 0 L28 18 L0 18 Z" fill="#cbd5e1" transform="scale(-1,1) translate(-28,0)"></path></g>
+    </g>
+    <text x="12" y="155" fill="#94a3b8" font-size="11" id="diode-type">diode: ideal</text>
+  </g>
+
+  <!-- Capacitor/filter -->
+  <g id="filter" transform="translate(720,30)">
+    <rect x="0" y="0" width="220" height="180" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="12" y="26" fill="#9fe6d8" font-size="14" font-weight="700">Smoothing Capacitor</text>
+    <g transform="translate(30,70)" stroke="#7dd3fc" stroke-width="6" stroke-linecap="round">
+      <line x1="0" y1="0" x2="0" y2="50" />
+      <line x1="18" y1="0" x2="18" y2="50" />
+    </g>
+    <text x="14" y="150" fill="#94a3b8" font-size="12" id="cap-vals">C: 470 µF, ESR: 0.1 Ω</text>
+  </g>
+
+  <!-- Regulator -->
+  <g id="reg-block" transform="translate(60,240)">
+    <rect x="0" y="0" width="360" height="160" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="14" y="24" fill="#9fe6d8" font-size="14" font-weight="700">Regulator & CC/CV Controller</text>
+    <text id="reg-vals" x="14" y="46" fill="#94a3b8" font-size="12">Linear, CC 0.5 A, CV 4.2 V</text>
+    <rect x="260" y="52" width="60" height="40" rx="6" fill="#2dd4bf" opacity="0.08"></rect>
+    <text x="270" y="78" fill="#9fe6d8" font-size="12">REG</text>
+  </g>
+
+  <!-- Battery -->
+  <g id="battery" transform="translate(520,260)">
+    <rect x="0" y="0" width="220" height="160" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="12" y="26" fill="#9fe6d8" font-size="14" font-weight="700">Li-ion Battery</text>
+    <g transform="translate(40,50)">
+      <rect x="0" y="0" width="120" height="60" rx="6" fill="#021826" stroke="#2dd4bf" stroke-width="2"></rect>
+      <rect x="122" y="20" width="8" height="20" rx="2" fill="#94a3b8"></rect>
+      <rect id="b-fill" x="4" y="4" width="112" height="52" rx="4" fill="url(#bgrad)"></rect>
+    </g>
+    <text id="b-vals" x="14" y="130" fill="#94a3b8" font-size="12">Vbatt 3.7 V — SoC 50%</text>
+  </g>
+
+  <!-- thermometer -->
+  <g id="thermo-g" transform="translate(960,220)">
+    <rect x="0" y="0" width="200" height="100" rx="10" fill="rgba(255,255,255,0.01)"/>
+    <text x="14" y="22" fill="#9fe6d8" font-size="13">Thermal</text>
+    <g transform="translate(20,36)">
+      <rect x="0" y="0" width="10" height="64" rx="6" fill="#042b33" stroke="#07333a"></rect>
+      <rect id="thermo-fill" x="0" y="40" width="10" height="24" rx="6" fill="#fb7185"></rect>
+    </g>
+    <text id="temp-val" x="44" y="68" fill="#94a3b8" font-size="13">T = 25.0 °C</text>
+  </g>
+</svg>
+
+
+      </div>
+
+      <!-- Waveforms -->
+      <div style="margin-top:12px">
+        <strong>Waveforms</strong>
+        <div class="wave-row" style="margin-top:8px">
+          <canvas id="canvas-rect" class="wave-canvas"></canvas>
+          <canvas id="canvas-ripple" class="wave-canvas"></canvas>
+        </div>
+        <div class="wave-row" style="margin-top:10px">
+          <canvas id="canvas-icharge" class="wave-canvas"></canvas>
+          <canvas id="canvas-vbatt" class="wave-canvas"></canvas>
+        </div>
+        <div class="legend">
+          <small>Left-to-right: Rectified voltage | Ripple on capacitor | Charging current | Battery voltage</small>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Controls + metrics -->
+    <div class="right-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Controls</strong>
+        <div class="small">Interact & watch behavior change</div>
+      </div>
+
+      <div class="controls" style="margin-top:8px">
+        <!-- AC voltage amplitude -->
+        <div class="control-row">
+          <div class="label">AC amplitude (Vrms)</div>
+          <div class="input">
+            <input id="ac-volt" type="range" min="5" max="230" value="12" class="slider">
+            <div class="small" id="ac-volt-val">12 V</div>
+          </div>
+        </div>
+
+        <!-- AC frequency -->
+        <div class="control-row">
+          <div class="label">AC frequency (Hz)</div>
+          <div class="input">
+            <input id="ac-freq" type="range" min="10" max="400" value="50" class="slider">
+            <div class="small" id="ac-freq-val">50 Hz</div>
+          </div>
+        </div>
+
+        <!-- Transformer / SMPS -->
+        <div class="control-row">
+          <div class="label">Front-end mode</div>
+          <div class="input">
+            <select id="front-mode" class="select">
+              <option value="xfmr">Transformer</option>
+              <option value="smps">SMPS (DC stage)</option>
+            </select>
+            <div style="width:12px"></div>
+            <div class="small" id="xfmr-ratio-val">1 : 1</div>
+          </div>
+        </div>
+
+        <!-- Transformer ratio or SMPS DC out -->
+        <div class="control-row">
+          <div class="label">Transformer ratio</div>
+          <div class="input">
+            <input id="xfmr-ratio" type="range" min="0.2" max="5" step="0.01" value="1" class="slider">
+            <div class="small" id="xfmr-ratio-label">1.00</div>
+          </div>
+        </div>
+
+        <!-- Diode type -->
+        <div class="control-row">
+          <div class="label">Diode type</div>
+          <div class="input">
+            <select id="diode-type" class="select">
+              <option value="ideal">Ideal (0 V drop)</option>
+              <option value="silicon">Silicon (0.7 V)</option>
+              <option value="schottky">Schottky (0.35 V)</option>
+            </select>
+            <div class="small" id="diode-desc">ideal</div>
+          </div>
+        </div>
+
+        <!-- Capacitor value -->
+        <div class="control-row">
+          <div class="label">Capacitance (µF)</div>
+          <div class="input">
+            <input id="cap-val" type="range" min="1" max="4700" value="470" class="slider">
+            <div class="small" id="cap-val-label">470 µF</div>
+          </div>
+        </div>
+
+        <!-- ESR -->
+        <div class="control-row">
+          <div class="label">Capacitor ESR (Ω)</div>
+          <div class="input">
+            <input id="cap-esr" type="range" min="0" max="2" step="0.01" value="0.1" class="slider">
+            <div class="small" id="cap-esr-label">0.10 Ω</div>
+          </div>
+        </div>
+
+        <!-- Regulator -->
+        <div class="control-row">
+          <div class="label">Regulator type</div>
+          <div class="input">
+            <select id="reg-type" class="select">
+              <option value="linear">Linear</option>
+              <option value="buck">Buck (switching)</option>
+            </select>
+            <div class="small" id="reg-desc">linear</div>
+          </div>
+        </div>
+
+        <!-- CC limit -->
+        <div class="control-row">
+          <div class="label">Charging current CC (A)</div>
+          <div class="input">
+            <input id="cc-limit" type="range" min="0.05" max="2.0" step="0.01" value="0.5" class="slider">
+            <div class="small" id="cc-limit-val">0.50 A</div>
+          </div>
+        </div>
+
+        <!-- CV voltage -->
+        <div class="control-row">
+          <div class="label">CV voltage (V)</div>
+          <div class="input">
+            <input id="cv-voltage" type="range" min="3.6" max="4.25" step="0.01" value="4.20" class="slider">
+            <div class="small" id="cv-voltage-val">4.20 V</div>
+          </div>
+        </div>
+
+        <!-- Battery capacity -->
+        <div class="control-row">
+          <div class="label">Battery capacity (mAh)</div>
+          <div class="input">
+            <input id="batt-cap" type="range" min="100" max="10000" step="10" value="2000" class="slider">
+            <div class="small" id="batt-cap-val">2000 mAh</div>
+          </div>
+        </div>
+
+        <!-- Battery initial SoC -->
+        <div class="control-row">
+          <div class="label">Initial State of Charge (%)</div>
+          <div class="input">
+            <input id="batt-soc" type="range" min="0" max="100" step="1" value="50" class="slider">
+            <div class="small" id="batt-soc-val">50%</div>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="btn-row">
+          <button id="start-btn">Start Simulation</button>
+          <button id="pause-btn" class="secondary">Pause</button>
+          <button id="reset-btn" class="secondary">Reset</button>
+        </div>
+
+        <!-- Numeric display -->
+        <div class="numeric-grid" style="margin-top:10px">
+          <div class="metric">
+            <div class="lbl">Output voltage (V)</div>
+            <div class="val" id="out-voltage">0.00 V</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Charging current (A)</div>
+            <div class="val" id="out-current">0.000 A</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Ripple (Vpp)</div>
+            <div class="val" id="ripple-val">0.000 V</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Battery Voltage</div>
+            <div class="val" id="batt-voltage">0.000 V</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Battery SoC</div>
+            <div class="val" id="batt-soc-display">0 %</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Regulator Temp</div>
+            <div class="val" id="temp-display">25.0 °C</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom panel note -->
+  <div class="bottom-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Notes & Controls</strong>
+      <div class="small">Animations: <span id="fps">-- fps</span></div>
+    </div>
+    <div style="margin-top:8px;color:var(--muted);font-size:0.92rem">
+      This model simplifies many real-world effects (thermal dynamics, exact switching behavior, protection loops). It's designed for educational demonstration: experiment with diode drops, capacitance, ESR and regulator type to see how ripple, charging current and battery voltage change.
+    </div>
+  </div>
+
+</div>
+<script>
+/* Full patched script:
+   - time-stamped waveform buffers, resampling & time-window plotting
+   - electron particles constrained to wire paths (IDs used: wire_ac_tx, wire_tx_br, wire_br_cap, wire_cap_reg, wire_reg_batt)
+   - auto-stop when battery SOC >= 100%
+   - India defaults: AC = 230 V, 50 Hz
+*/
+(function(){
+  'use strict';
+
+  // DOM helper
+  const el = id => document.getElementById(id);
+
+  // Controls (must match your existing control IDs)
+  const acVolt = el('ac-volt');
+  const acFreq = el('ac-freq');
+  const frontMode = el('front-mode');
+  const xfmrRatio = el('xfmr-ratio');
+  const diodeType = el('diode-type');
+  const capVal = el('cap-val');
+  const capESR = el('cap-esr');
+  const regType = el('reg-type');
+  const ccLimit = el('cc-limit');
+  const cvVoltage = el('cv-voltage');
+  const battCap = el('batt-cap');
+  const battSoc = el('batt-soc');
+  const startBtn = el('start-btn');
+  const pauseBtn = el('pause-btn');
+  const resetBtn = el('reset-btn');
+
+  // UI displays (must exist)
+  const acVoltVal = el('ac-volt-val');
+  const acFreqVal = el('ac-freq-val');
+  const xfmrRatioLabel = el('xfmr-ratio-label');
+  const diodeDesc = el('diode-desc');
+  const capValLabel = el('cap-val-label');
+  const capEsrLabel = el('cap-esr-label');
+  const regDesc = el('reg-desc');
+  const ccLimitVal = el('cc-limit-val');
+  const cvVoltageVal = el('cv-voltage-val');
+  const battCapVal = el('batt-cap-val');
+  const battSocVal = el('batt-soc-val');
+  const simState = el('sim-state');
+
+  const outVoltage = el('out-voltage');
+  const outCurrent = el('out-current');
+  const rippleVal = el('ripple-val');
+  const battVoltage = el('batt-voltage');
+  const battSocDisplay = el('batt-soc-display');
+  const tempDisplay = el('temp-display');
+  const fpsText = el('fps');
+
+  // SVG references
+  const svg = el('circuit');
+  const bfill = svg ? svg.querySelector('#b-fill') : null;
+  const bvals = el('b-vals');
+  const capValsText = el('cap-vals');
+  const acValsText = svg ? svg.querySelector('#ac-vals') : null;
+  const xfmrLabel = svg ? svg.querySelector('#xfmr-label') : null;
+  const xfmrVals = svg ? svg.querySelector('#xfmr-vals') : null;
+  const smpsBadge = svg ? svg.querySelector('#smps-badge') : null;
+  const diodeTypeText = svg ? svg.querySelector('#diode-type') : null;
+  const regVals = svg ? svg.querySelector('#reg-vals') : null;
+  const diodeColorNodes = svg ? [svg.querySelector('#d1'), svg.querySelector('#d2'), svg.querySelector('#d3'), svg.querySelector('#d4')] : [];
+  const thermoFill = svg ? svg.querySelector('#thermo-fill') : null;
+  const tempValText = svg ? svg.querySelector('#temp-val') : null;
+
+  // Canvas contexts; assumes canvases exist with these IDs like your earlier UI
+  const canvRect = el('canvas-rect'); const ctxRect = canvRect ? canvRect.getContext('2d') : null;
+  const canvRipple = el('canvas-ripple'); const ctxRipple = canvRipple ? canvRipple.getContext('2d') : null;
+  const canvI = el('canvas-icharge'); const ctxI = canvI ? canvI.getContext('2d') : null;
+  const canvVb = el('canvas-vbatt'); const ctxVb = canvVb ? canvVb.getContext('2d') : null;
+
+  // robust resize
+  function resizeCanvas(c){
+    if(!c) return 1;
+    const rect = c.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = rect.width || parseFloat(getComputedStyle(c).width) || 300;
+    const cssH = rect.height || parseFloat(getComputedStyle(c).height) || 160;
+    c.width = Math.max(1, Math.round(cssW * dpr));
+    c.height = Math.max(1, Math.round(cssH * dpr));
+    c.style.width = cssW + 'px';
+    c.style.height = cssH + 'px';
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return dpr;
+  }
+  function resizeAll(){
+    resizeCanvas(canvRect);
+    resizeCanvas(canvRipple);
+    resizeCanvas(canvI);
+    resizeCanvas(canvVb);
+  }
+  window.addEventListener('resize', ()=> setTimeout(resizeAll,20));
+  setTimeout(resizeAll, 60);
+
+  /* ---------------------------
+     State (India defaults)
+  --------------------------- */
+  const state = {
+    ac_rms: (acVolt && +acVolt.value) ? +acVolt.value : 230, // default India mains
+    ac_freq: (acFreq && +acFreq.value) ? +acFreq.value : 50,
+    front_mode: frontMode ? frontMode.value : 'xfmr',
+    xfmr_ratio: xfmrRatio ? +xfmrRatio.value : 1,
+    diode: diodeType ? diodeType.value : 'ideal',
+    diode_drop: 0,
+    C: (capVal && +capVal.value ? +capVal.value : 470) * 1e-6,
+    ESR: (capESR && +capESR.value) ? +capESR.value : 0.1,
+    Vcap: 0,
+    reg_type: regType ? regType.value : 'linear',
+    cc_limit: ccLimit ? +ccLimit.value : 0.5,
+    cv_voltage: cvVoltage ? +cvVoltage.value : 4.2,
+    reg_out: 0,
+    reg_temp: 25,
+    batt_capacity_mAh: battCap ? +battCap.value : 2000,
+    batt_capacity_Ah: battCap ? (+battCap.value / 1000) : 2.0,
+    batt_soc: battSoc ? (+battSoc.value / 100) : 0.5,
+    batt_Rint: 0.2,
+    batt_Voc_low: 3.0,
+    batt_Voc_high: 4.2,
+    batt_voltage: 3.7,
+    source_resistance: 0.5,
+    smps_noise: 0.04
+  };
+
+  function rmsToPeak(v){ return v * Math.SQRT2; }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+
+  function updateDiodeDrop(){
+    switch(state.diode){
+      case 'ideal': state.diode_drop = 0; break;
+      case 'schottky': state.diode_drop = 0.35; break;
+      case 'silicon': state.diode_drop = 0.7; break;
+      default: state.diode_drop = 0.6;
+    }
+    if(diodeTypeText) diodeTypeText.textContent = 'diode: ' + (state.diode === 'ideal' ? 'ideal' : state.diode);
+  }
+
+  function battVoc(soc){ return state.batt_Voc_low + (state.batt_Voc_high - state.batt_Voc_low) * clamp(soc,0,1); }
+
+  // time-stamped circular buffers
+  const bufferLength = 4000;
+  const bufRect = new Float32Array(bufferLength);
+  const bufRipple = new Float32Array(bufferLength);
+  const bufI = new Float32Array(bufferLength);
+  const bufVbatt = new Float32Array(bufferLength);
+  const bufTime = new Float64Array(bufferLength);
+  let bufIdx = 0;
+  const now0 = performance.now() / 1000;
+  for(let i=0;i<bufferLength;i++){
+    bufRect[i] = 0; bufRipple[i] = 0; bufI[i] = 0; bufVbatt[i] = state.batt_voltage; bufTime[i] = now0 - (bufferLength - i) * 0.01;
+  }
+
+  // UI safe write
+  function safeText(elm, txt){ if(elm) elm.textContent = txt; }
+
+  // display updater
+  let currentToShow = 0;
+  let lastRipple = 0;
+  function updateDisplays(){
+    safeText(acVoltVal, state.ac_rms.toFixed(1) + ' V');
+    safeText(acFreqVal, state.ac_freq.toFixed(1) + ' Hz');
+    safeText(xfmrRatioLabel, state.xfmr_ratio.toFixed(2));
+    if(xfmrVals) xfmrVals.textContent = 'ratio ' + state.xfmr_ratio.toFixed(2);
+    if(smpsBadge) smpsBadge.setAttribute('opacity', state.front_mode === 'smps' ? '1' : '0');
+    safeText(diodeDesc, state.diode);
+    safeText(capValLabel, Math.round(state.C*1e6) + ' µF');
+    safeText(capEsrLabel, state.ESR.toFixed(2) + ' Ω');
+    safeText(regDesc, state.reg_type);
+    safeText(ccLimitVal, state.cc_limit.toFixed(2) + ' A');
+    safeText(cvVoltageVal, state.cv_voltage.toFixed(2) + ' V');
+    safeText(battCapVal, Math.round(state.batt_capacity_mAh) + ' mAh');
+    safeText(battSocVal, Math.round(state.batt_soc*100) + '%');
+
+    safeText(outVoltage, state.reg_out.toFixed(3) + ' V');
+    safeText(outCurrent, (currentToShow||0).toFixed(3) + ' A');
+    safeText(rippleVal, lastRipple.toFixed(4) + ' V');
+    safeText(battVoltage, state.batt_voltage.toFixed(3) + ' V');
+    safeText(battSocDisplay, Math.round(state.batt_soc*100) + ' %');
+    safeText(tempDisplay, state.reg_temp.toFixed(1) + ' °C');
+    safeText(bvals, 'Vbatt ' + state.batt_voltage.toFixed(3) + ' V — SoC ' + Math.round(state.batt_soc*100) + '%');
+    safeText(capValsText, 'C: ' + Math.round(state.C*1e6) + ' µF, ESR: ' + state.ESR.toFixed(2) + ' Ω');
+    safeText(acValsText, state.ac_rms + ' V, ' + state.ac_freq + ' Hz');
+    safeText(regVals, (state.reg_type === 'linear' ? 'Linear' : 'Buck') + ', CC ' + state.cc_limit.toFixed(2) + ' A, CV ' + state.cv_voltage.toFixed(2) + ' V');
+
+    // thermometer
+    const tnorm = clamp((state.reg_temp - 20) / 60, 0, 1);
+    if(thermoFill) { thermoFill.setAttribute('y', String(64*(1-tnorm))); thermoFill.setAttribute('height', String(64*tnorm)); }
+    safeText(tempValText, 'T = ' + state.reg_temp.toFixed(1) + ' °C');
+  }
+
+  /* ----------------------------
+     Simulation step (internal substepping)
+  ---------------------------- */
+  let last_I_to_reg_input = 0;
+
+  function stepSimulation(dt){
+    const subSteps = Math.max(1, Math.min(40, Math.ceil((dt * 1000) / 2)));
+    const subDt = dt / subSteps;
+
+    for(let ss=0; ss<subSteps; ss++){
+      const tNow = performance.now() / 1000;
+      const omega = 2 * Math.PI * state.ac_freq;
+      const Vpk = rmsToPeak(state.ac_rms) * state.xfmr_ratio;
+
+      let v_secondary = 0;
+      if(state.front_mode === 'xfmr'){
+        v_secondary = Vpk * Math.sin(omega * tNow);
+      } else {
+        const baseDC = Math.abs(Vpk) * 0.7;
+        const sw = Math.sin(2 * Math.PI * 10000 * tNow) * (state.smps_noise * baseDC);
+        v_secondary = baseDC + sw;
+      }
+
+      const diodeDrop = state.diode_drop;
+      const v_rectified = Math.max(0, Math.abs(v_secondary) - diodeDrop);
+
+      let Icharge_in = 0;
+      if(v_rectified > state.Vcap + 1e-9){
+        Icharge_in = (v_rectified - state.Vcap) / (state.source_resistance + state.ESR);
+      } else {
+        Icharge_in = 0;
+      }
+
+      const Voc = battVoc(state.batt_soc);
+      const dropout = (state.reg_type === 'linear') ? 1.0 : 0.25;
+      const Vout_max = Math.max(0, state.Vcap - dropout);
+
+      let I_supply_lim = (state.Vcap > Voc) ? (state.Vcap - Voc) / (state.source_resistance + state.batt_Rint + state.ESR) : 0;
+      let batt_charge_current = 0;
+      let reg_output = 0;
+
+      if(state.batt_voltage < state.cv_voltage - 1e-6){
+        const targetI = state.cc_limit;
+        batt_charge_current = Math.min(targetI, I_supply_lim, state.cc_limit);
+        reg_output = Voc + batt_charge_current * state.batt_Rint;
+      } else {
+        reg_output = Math.min(Vout_max, state.cv_voltage);
+        batt_charge_current = Math.max(0, (reg_output - Voc) / state.batt_Rint);
+        batt_charge_current = Math.min(batt_charge_current, I_supply_lim);
+      }
+
+      let power_loss = 0;
+      if(state.reg_type === 'linear'){
+        power_loss = Math.max(0, state.Vcap - reg_output) * batt_charge_current;
+      } else {
+        const eff = 0.90;
+        power_loss = Math.max(0, (1/eff - 1) * (reg_output * batt_charge_current));
+      }
+
+      const ambient = 25.0;
+      const thermal_k = 0.05;
+      state.reg_temp += (power_loss * thermal_k - (state.reg_temp - ambient) * 0.02) * subDt * 10;
+
+      let I_to_reg_input = 0;
+      if(state.reg_type === 'linear'){
+        I_to_reg_input = batt_charge_current;
+      } else {
+        const eff = 0.90;
+        const Vin = Math.max(0.01, state.Vcap);
+        I_to_reg_input = (reg_output * batt_charge_current) / (eff * Vin + 1e-9);
+      }
+      last_I_to_reg_input = I_to_reg_input;
+
+      if(state.C > 0){
+        state.Vcap += (Icharge_in - I_to_reg_input) * subDt / state.C;
+      }
+      if(state.Vcap > 0){
+        state.Vcap -= (1e-6 / Math.max(state.C,1e-9)) * subDt;
+      }
+
+      const Vmax_possible = (state.front_mode === 'xfmr') ? Math.abs(Vpk) : Math.abs(Vpk) * 0.8 + Math.abs(Vpk) * state.smps_noise;
+      state.Vcap = clamp(state.Vcap, 0, Math.max(Vmax_possible * 1.5, 50));
+
+      state.batt_voltage = Voc + batt_charge_current * state.batt_Rint;
+      const capacity_Ah = Math.max(1e-6, state.batt_capacity_Ah);
+      state.batt_soc += (batt_charge_current * subDt) / (capacity_Ah * 3600.0);
+      state.batt_soc = clamp(state.batt_soc, 0, 1);
+
+      currentToShow = batt_charge_current;
+    }
+
+    // ripple estimate
+    const f = Math.max(0.1, state.ac_freq);
+    const delta_t_between_peaks = 1 / (2 * f);
+    const IloadApprox = last_I_to_reg_input || currentToShow || 0;
+    lastRipple = (IloadApprox * delta_t_between_peaks) / Math.max(state.C,1e-12);
+
+    // push sample
+    const tnow = performance.now() / 1000;
+    const rectSample = (state.front_mode === 'xfmr') ?
+      (rmsToPeak(state.ac_rms) * state.xfmr_ratio * Math.abs(Math.sin(2*Math.PI*state.ac_freq*tnow))) :
+      (Math.abs(rmsToPeak(state.ac_rms)*0.7) + Math.sin(2*Math.PI*10000*tnow)*state.smps_noise*Math.abs(rmsToPeak(state.ac_rms)));
+
+    bufRect[bufIdx] = rectSample;
+    bufRipple[bufIdx] = lastRipple;
+    bufI[bufIdx] = currentToShow;
+    bufVbatt[bufIdx] = state.batt_voltage;
+    bufTime[bufIdx] = tnow;
+    bufIdx = (bufIdx + 1) % bufferLength;
+
+    // Auto-stop when battery full
+    if(state.batt_soc >= 1.0){
+      running = false;
+      if(simState) simState.textContent = 'State: battery full';
+      currentToShow = 0;
+      hideParticles();
+    }
+  }
+
+  /* ----------------------------
+     drawTimeSeries (time-windowed)
+  ---------------------------- */
+  function drawTimeSeries(ctx, dataBuf, timeBuf, opts){
+    if(!ctx || !ctx.canvas) return;
+    const canvas = ctx.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || parseFloat(getComputedStyle(canvas).width) || 300;
+    const cssH = canvas.clientHeight || parseFloat(getComputedStyle(canvas).height) || 160;
+    const w = cssW, h = cssH;
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#041226'; ctx.fillRect(0,0,w,h);
+
+    const pad = 36; const px = pad, py = pad, pw = w - pad*2, ph = h - pad*2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,py+ph); ctx.lineTo(px+pw,py+ph); ctx.stroke();
+
+    const tnow = performance.now() / 1000;
+    const timeWindow = (opts && opts.timeWindow) ? opts.timeWindow : 0.5;
+    const tstart = tnow - timeWindow;
+
+    const points = [];
+    for(let i=0;i<bufferLength;i++){
+      const idx = (bufIdx - 1 - i + bufferLength) % bufferLength;
+      const t = timeBuf[idx];
+      if(t >= tstart && t <= tnow){
+        points.push({t: t, v: dataBuf[idx]});
+      } else if(t < tstart){
+        break;
+      }
+    }
+    points.reverse();
+
+    if(points.length === 0){
+      ctx.fillStyle = '#a6cbd6'; ctx.font = '12px Inter, system-ui'; ctx.textAlign = 'left';
+      ctx.fillText(opts.title || '', px, py - 12); ctx.restore(); return;
+    }
+
+    let min = Infinity, max = -Infinity;
+    for(const p of points){ if(p.v < min) min = p.v; if(p.v > max) max = p.v; }
+    if(!isFinite(min) || !isFinite(max)){ min = 0; max = 1; }
+    if(Math.abs(max-min) < 1e-6){ max += 1; min -= 1; }
+    const margin = 0.08*(max-min); max += margin; min -= margin;
+
+    const maxPts = Math.max(100, Math.floor(pw));
+    let stride = 1; if(points.length > maxPts) stride = Math.ceil(points.length / maxPts);
+
+    ctx.fillStyle = '#8ea7bb'; ctx.font = '11px Inter, system-ui'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const ticks = 4;
+    for(let i=0;i<=ticks;i++){
+      const y = py + ph - (ph * i / ticks);
+      const val = min + (max-min) * i / ticks;
+      ctx.fillText(val.toFixed(3), px - 8, y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.beginPath(); ctx.moveTo(px - 4, y); ctx.lineTo(px + pw, y); ctx.stroke();
+    }
+
+    ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = opts.color || '#2dd4bf';
+    let moved = false;
+    for(let i=0;i<points.length;i+=stride){
+      const p = points[i];
+      const x = px + ((p.t - tstart) / (timeWindow)) * pw;
+      const y = py + ph - ((p.v - min) / (max - min)) * ph;
+      if(!moved){ ctx.moveTo(x,y); moved = true; } else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#a6cbd6'; ctx.font = '12px Inter, system-ui'; ctx.textAlign = 'left';
+    ctx.fillText(opts.title || '', px, py - 12);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#9fbfc9'; ctx.fillText(opts.rightLabel || '', px + pw, py - 12);
+
+    ctx.restore();
+  }
+
+  /* ==========================
+     ELECTRON PARTICLES
+     - Use the exact wire IDs you provided (A):
+       wire_ac_tx, wire_tx_br, wire_br_cap, wire_cap_reg, wire_reg_batt
+  ========================== */
+  const particlePathIds = ['wire_ac_tx','wire_tx_br','wire_br_cap','wire_cap_reg','wire_reg_batt'];
+  const particlePaths = [];
+
+  if(svg){
+    for(const id of particlePathIds){
+      const p = svg.querySelector('#' + id);
+      if(p && typeof p.getTotalLength === 'function'){
+        try{
+          const L = p.getTotalLength();
+          if(L > 6) particlePaths.push(p);
+        }catch(e){}
+      }
+    }
+    // as safety, add other paths with stroke but keep list short
+    if(particlePaths.length === 0){
+      const others = Array.from(svg.querySelectorAll('path')).slice(0,5);
+      for(const p of others){ if(typeof p.getTotalLength === 'function') particlePaths.push(p); }
+    }
+  }
+
+  // Particle objects
+  let particles = [];
+  function buildParticles(){
+    const arr = [];
+    if(!svg) return arr;
+    const perPath = 8; // particles per path (keeps count reasonable)
+    for(const path of particlePaths){
+      let len = 0;
+      try{ len = path.getTotalLength(); } catch(e){ len = 0; }
+      if(len <= 0) continue;
+      for(let i=0;i<perPath;i++){
+        arr.push({
+          path,
+          len,
+          pos: Math.random() * len,
+          speed: 0,
+          dot: null,
+          baseColor: '#00d4ff'
+        });
+      }
+    }
+    return arr;
+  }
+
+  particles = buildParticles();
+
+  function drawParticles(dt){
+    if(!svg || !particles) return;
+    const tnow = performance.now()/1000;
+    const omega = 2 * Math.PI * state.ac_freq;
+    const baseSpeed = 30; // px/s baseline
+    const scale = 200; // px/s per amp
+    for(const p of particles){
+      const I = Math.max(0, currentToShow || 0);
+      const acMod = (state.front_mode === 'xfmr') ? (Math.abs(Math.sin(omega * tnow)) * 0.8 + 0.2) : 1.0;
+      const speed = (baseSpeed + scale * I) * acMod;
+      p.speed = speed;
+      p.pos += p.speed * dt;
+      if(p.pos > p.len) p.pos = p.pos % p.len;
+
+      if(!p.dot){
+        const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('r','3.6');
+        dot.setAttribute('fill', p.baseColor);
+        dot.setAttribute('opacity','0.9');
+        dot.style.filter = 'url(#soft)';
+        svg.appendChild(dot);
+        p.dot = dot;
+      }
+      try{
+        const pt = p.path.getPointAtLength(p.pos);
+        p.dot.setAttribute('cx', pt.x);
+        p.dot.setAttribute('cy', pt.y);
+        p.dot.setAttribute('opacity', (running && currentToShow>0.0001) ? '0.9' : '0.18');
+      }catch(e){}
+    }
+  }
+
+  function hideParticles(){
+    if(!particles) return;
+    particles.forEach(p => { if(p.dot) p.dot.setAttribute('opacity','0'); });
+  }
+  function showParticles(){
+    if(!particles) return;
+    particles.forEach(p => { if(p.dot) p.dot.setAttribute('opacity','0.85'); });
+  }
+
+  // fallback if nothing built
+  if(particles.length === 0 && svg){
+    const fallback = svg.querySelector('#wire_ac_tx') || svg.querySelector('path');
+    if(fallback) { particlePaths.push(fallback); particles = buildParticles(); }
+  }
+
+  /* ----------------------------
+     Animation loop
+  ---------------------------- */
+  let running = false;
+  let lastTs = null;
+  let frames = 0, fpsTimer = 0;
+
+  function animate(ts){
+    if(!lastTs) lastTs = ts;
+    const dt_ms = ts - lastTs;
+    lastTs = ts;
+    const dt = Math.min(0.1, dt_ms / 1000);
+    if(running){
+      stepSimulation(dt);
+      drawParticles(dt);
+
+      // choose windows so frequency changes are visible
+      drawTimeSeries(ctxRect, bufRect, bufTime, { title: 'Rectified / Source Voltage', color:'#7dd3fc', rightLabel:'V', timeWindow: Math.max(0.02, 0.2) });
+      drawTimeSeries(ctxRipple, bufRipple, bufTime, { title: 'Capacitor Ripple (Vpp)', color:'#ffd166', rightLabel:'V', timeWindow: 1.0 });
+      drawTimeSeries(ctxI, bufI, bufTime, { title: 'Charging Current', color:'#a78bfa', rightLabel:'A', timeWindow: 5.0 });
+      drawTimeSeries(ctxVb, bufVbatt, bufTime, { title: 'Battery Voltage', color:'#60a5fa', rightLabel:'V', timeWindow: 20.0 });
+
+      updateDisplays();
+
+      // svg highlights and battery fill
+      const chargeActive = currentToShow > 0.001;
+      diodeColorNodes.forEach(n => { if(n){ n.setAttribute('fill', chargeActive ? '#ffd166' : '#cbd5e1'); n.setAttribute('opacity', chargeActive ? '1.0' : '0.45'); }});
+      if(bfill){ bfill.setAttribute('width', String(Math.max(2, 112 * clamp(state.batt_soc,0,1)))); bfill.setAttribute('fill', state.batt_soc>0.8? '#34d399' : (state.batt_soc>0.4? '#facc15' : '#fb7185')); }
+
+      fpsTimer += dt; frames++;
+      if(fpsTimer > 0.5){ safeText(fpsText, Math.round(frames/fpsTimer) + ' fps'); fpsTimer = 0; frames = 0; }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  // Start / Pause / Reset wiring
+  if(startBtn) startBtn.addEventListener('click', ()=>{
+    // if batt full, reset SoC to just below 100% so user can see flow if they want (honour your earlier reset behaviour)
+    if(state.batt_soc >= 1.0) {
+      state.batt_soc = 0.999;
+    }
+    running = true; safeText(simState, 'State: running'); lastTs = null; resizeAll();
+    // rebuild particles if necessary and show (but hide automatically if batt full)
+    if(particles.length === 0) particles = buildParticles();
+    if(state.batt_soc < 1.0) showParticles();
+  });
+  if(pauseBtn) pauseBtn.addEventListener('click', ()=>{
+    running = !running; safeText(simState, running ? 'State: running' : 'State: paused');
+    if(!running) hideParticles(); else if(state.batt_soc < 1.0) showParticles();
+  });
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{
+    running = false; safeText(simState, 'State: paused');
+    state.Vcap = 0; state.batt_soc = (battSoc ? (+battSoc.value / 100) : 0.5); state.batt_capacity_mAh = (battCap ? +battCap.value : 2000);
+    state.batt_capacity_Ah = state.batt_capacity_mAh / 1000; state.batt_voltage = battVoc(state.batt_soc); state.reg_temp = 25;
+    const t0 = performance.now()/1000;
+    for(let i=0;i<bufferLength;i++){ bufRect[i]=0; bufRipple[i]=0; bufI[i]=0; bufVbatt[i]=state.batt_voltage; bufTime[i]=t0 - (bufferLength - i)*0.01; }
+    bufIdx = 0; updateDisplays(); resizeAll();
+    particles = buildParticles(); showParticles();
+  });
+
+  // controls bindings
+  function bindRange(r, cb){ if(!r) return; r.addEventListener('input', ()=>cb(r.value)); r.addEventListener('change', ()=>cb(r.value)); }
+  bindRange(acVolt, v => { state.ac_rms = Number(v); });
+  bindRange(acFreq, v => { state.ac_freq = Number(v); });
+  if(frontMode) frontMode.addEventListener('change', ()=> state.front_mode = frontMode.value);
+  bindRange(xfmrRatio, v => state.xfmr_ratio = Number(v));
+  if(diodeType) diodeType.addEventListener('change', ()=>{ state.diode = diodeType.value; updateDiodeDrop(); });
+  bindRange(capVal, v => state.C = Number(v)*1e-6);
+  bindRange(capESR, v => state.ESR = Number(v));
+  if(regType) regType.addEventListener('change', ()=> state.reg_type = regType.value);
+  bindRange(ccLimit, v => state.cc_limit = Number(v));
+  bindRange(cvVoltage, v => state.cv_voltage = Number(v));
+  bindRange(battCap, v => { state.batt_capacity_mAh = Number(v); state.batt_capacity_Ah = Number(v)/1000; });
+  bindRange(battSoc, v => { state.batt_soc = Number(v)/100; state.batt_voltage = battVoc(state.batt_soc); });
+
+  updateDiodeDrop();
+  updateDisplays();
+  requestAnimationFrame(animate);
+
+})();
+</script>
+
+</body>
+</html>
